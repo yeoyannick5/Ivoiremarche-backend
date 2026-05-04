@@ -1,0 +1,143 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── UTILISATEUR ─────────────────────────────
+model User {
+  id          String   @id @default(uuid())
+  phone       String   @unique          // Numéro CI : +2250XXXXXXXXX
+  nom         String
+  prenom      String
+  email       String?  @unique
+  password    String
+  isVerified  Boolean  @default(false)
+  isAdmin     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wallet      Wallet?
+  bets        Bet[]
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+// ─── WALLET ──────────────────────────────────
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  solde     Float    @default(0)        // En FCFA
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+// ─── MARCHÉ ──────────────────────────────────
+model Market {
+  id          String       @id @default(uuid())
+  question    String
+  context     String
+  category    MarketCategory
+  probOui     Float        @default(50)  // % de chances OUI
+  volumeTotal Float        @default(0)   // En FCFA
+  statut      MarketStatut @default(OUVERT)
+  resultat    Boolean?                   // null = pas encore résolu
+  endsAt      DateTime
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  bets        Bet[]
+
+  @@map("markets")
+}
+
+enum MarketCategory {
+  SPORT
+  POLITIQUE
+  ECONOMIE
+  SECURITE
+  TECH
+  CULTURE
+}
+
+enum MarketStatut {
+  OUVERT
+  FERME
+  RESOLU
+  ANNULE
+}
+
+// ─── PARI ────────────────────────────────────
+model Bet {
+  id        String    @id @default(uuid())
+  userId    String
+  marketId  String
+  choix     Boolean              // true = OUI, false = NON
+  montant   Float                // Mise en FCFA
+  cote      Float                // Cote au moment du pari
+  gainPotentiel Float            // montant / prob au moment du pari
+  statut    BetStatut @default(EN_ATTENTE)
+  gainReel  Float?               // Rempli si gagné
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  market    Market    @relation(fields: [marketId], references: [id])
+
+  @@map("bets")
+}
+
+enum BetStatut {
+  EN_ATTENTE
+  GAGNE
+  PERDU
+  REMBOURSE
+}
+
+// ─── TRANSACTION ─────────────────────────────
+model Transaction {
+  id            String            @id @default(uuid())
+  userId        String
+  type          TransactionType
+  montant       Float             // En FCFA
+  statut        TransactionStatut @default(PENDING)
+  provider      MobileMoneyProvider?
+  phoneProvider String?           // Numéro Mobile Money
+  reference     String?           @unique  // Référence externe opérateur
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user          User              @relation(fields: [userId], references: [id])
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  DEPOT
+  RETRAIT
+  PARI
+  GAIN
+  REMBOURSEMENT
+}
+
+enum TransactionStatut {
+  PENDING
+  SUCCES
+  ECHEC
+  ANNULE
+}
+
+enum MobileMoneyProvider {
+  ORANGE_MONEY
+  WAVE
+  MTN_MOMO
+}
